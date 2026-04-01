@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { authAPI } from '../api/api';
+import { decodeToken } from '../utils/auth';
 import RoleBadge from '../components/RoleBadge';
 
 const DEMO_ACCOUNTS = [
@@ -9,29 +11,35 @@ const DEMO_ACCOUNTS = [
   { email: 'viewer@zorvyn.com', password: 'viewer123', role: 'VIEWER' },
 ];
 
-const DEMO_USERS = {
-  'admin@zorvyn.com': { name: 'Admin User', email: 'admin@zorvyn.com', role: 'ADMIN', status: 'ACTIVE', createdAt: '2024-01-15' },
-  'analyst@zorvyn.com': { name: 'Analyst User', email: 'analyst@zorvyn.com', role: 'ANALYST', status: 'ACTIVE', createdAt: '2024-02-20' },
-  'viewer@zorvyn.com': { name: 'Viewer User', email: 'viewer@zorvyn.com', role: 'VIEWER', status: 'ACTIVE', createdAt: '2024-03-10' },
-};
-
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    const match = DEMO_ACCOUNTS.find((a) => a.email === email && a.password === password);
-    if (!match) {
-      setError('Invalid email or password.');
-      return;
+    setLoading(true);
+    try {
+      const { data } = await authAPI.login({ email, password });
+      const { token, user } = data;
+      // Decode role from token as fallback
+      const decoded = decodeToken(token);
+      const userData = {
+        id: user?.id ?? decoded?.userId,
+        name: user?.name ?? email,
+        role: user?.role ?? decoded?.role ?? 'VIEWER',
+      };
+      login(userData, token);
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Invalid email or password.');
+    } finally {
+      setLoading(false);
     }
-    login(DEMO_USERS[email], 'demo-token');
-    navigate('/dashboard');
   };
 
   const fillDemo = (account) => {
@@ -68,13 +76,29 @@ const Login = () => {
               required
               className={inputCls}
             />
-            {error && <p className="text-rose-400 text-xs">{error}</p>}
+            {error && (
+              <div className="flex items-center gap-2.5 bg-rose-500/10 border border-rose-500/30 rounded-lg px-3 py-2.5 animate-fade-in">
+                <span className="text-rose-400 font-bold text-sm flex-shrink-0">✕</span>
+                <p className="text-rose-400 text-xs leading-snug">{error}</p>
+              </div>
+            )}
             <button
               type="submit"
               id="sign-in-btn"
-              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium py-2.5 rounded-lg transition-colors duration-150"
+              disabled={loading}
+              className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium py-2.5 rounded-lg transition-colors duration-150 flex items-center justify-center gap-2"
             >
-              Sign In
+              {loading ? (
+                <>
+                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                  Signing In…
+                </>
+              ) : (
+                'Sign In'
+              )}
             </button>
           </form>
 
@@ -96,6 +120,13 @@ const Login = () => {
               ))}
             </div>
           </div>
+
+          <p className="text-slate-500 text-xs text-center mt-5">
+            Don't have an account?{' '}
+            <Link to="/signup" className="text-indigo-400 hover:text-indigo-300 transition-colors duration-150">
+              Sign up
+            </Link>
+          </p>
         </div>
       </div>
     </div>

@@ -13,7 +13,10 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
+    const isAuthEndpoint = err.config?.url?.startsWith('/auth/');
+    // Only force-redirect on 401 for protected routes, NOT for login/register calls.
+    // If we redirected on login failures the error would never reach Login.jsx's catch block.
+    if (err.response?.status === 401 && !isAuthEndpoint) {
       localStorage.clear();
       window.location.href = '/login';
     }
