@@ -1,6 +1,6 @@
 # Zorvyn Finance Dashboard Backend
 
-This project is a backend system for a finance dashboard that manages financial transactions, user roles, and summary analytics.
+This repository focuses on the backend system of the Zorvyn Finance Dashboard, with a working frontend included for demonstration and testing purposes.
 
 The system is designed to demonstrate backend architecture, role-based access control, data modeling, and API design for a multi-user financial application.
 
@@ -18,7 +18,15 @@ It supports different user roles with controlled access to financial data and pr
 - Category-wise aggregation
 - Multi-user data ownership
 - Seed script for initial data setup
+- Minimal frontend provided to demonstrate backend functionality
 
+## Tech Stack
+
+- Backend: Node.js, Express.js
+- Database: MySQL
+- ORM: Prisma
+- Authentication: JWT
+- Frontend (for demo/testing): React (Vite) + Tailwind CSS
 
 ## Architecture
 
@@ -49,6 +57,8 @@ Stores financial data linked to a user.
 Relationships:
 - One user can have multiple transactions
 - Each transaction belongs to a single user
+
+Primary keys and foreign key constraints ensure data integrity between users and transactions.
 
 Prisma is used for type-safe queries and schema management.
 Schema defined in:
@@ -150,6 +160,15 @@ backend/
   .env
   server.js
 
+## Engineering Decisions
+
+- Used Prisma ORM for clean data access and type safety
+- Implemented soft delete instead of hard delete to preserve audit history
+- RBAC enforced at middleware level for scalability
+- Aggregations handled in service layer instead of raw SQL for clarity
+- JWT-based authentication used for stateless sessions
+
+
 ## Setup
 
 1. Clone repository
@@ -158,7 +177,7 @@ backend/
 npm install
 
 3. Configure environment variables (.env)
-
+ Copy `.env.example` to `.env` and update values
 4. Run migrations
 npx prisma migrate dev
 
@@ -181,6 +200,22 @@ npm run dev
 - No advanced indexing or optimization applied due to scope
 - Authentication is simplified (no refresh tokens)
 
+## Edge Cases Handled
+
+- Invalid login credentials
+- Unauthorized role access
+- Filtering with no results
+- Soft-deleted records excluded from queries
+
+## Future Improvements
+
+- Add refresh token-based authentication
+- Move aggregations to database level for performance
+- Add indexing on date and category fields
+- Implement audit logs for transactions
+- Add caching (Redis) for dashboard summary
+- Add rate limiting for APIs
+
 ## Testing
 
 - APIs tested using Postman
@@ -195,3 +230,34 @@ npm run dev
 - Login once → token auto-saves
 
 All APIs are pre-configured with authentication.
+
+## Screenshots
+
+### Login Page
+![Login](./screenshots/Login.png)
+
+### Dashboard Overview
+![Dashboard](./screenshots/Dashboard_1.png)
+
+### Dashboard Analytics
+![Dashboard](./screenshots/Dashboard_2.png)
+
+### Transactions
+![Transactions](./screenshots/Transactions.png)
+
+### Filters Applied
+![Filters](./screenshots/Filter.png)
+
+### User Management
+![User Management](./screenshots/User_Management.png)
+
+## Author Notes
+
+This project was developed as part of a backend-focused assessment to demonstrate:
+
+- Scalable API design
+- Role-based access control
+- Clean architecture practices
+- Real-world financial data handling
+
+Focus was placed on maintainability, clarity, and practical backend engineering decisions.
