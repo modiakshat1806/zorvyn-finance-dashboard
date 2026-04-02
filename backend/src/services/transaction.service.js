@@ -1,5 +1,6 @@
 import prisma from "../config/db.js";
 
+
 export const createTransactionService = async (userId, data) => {
     const { amount, type, category, date, notes } = data;
 
@@ -15,6 +16,7 @@ export const createTransactionService = async (userId, data) => {
     });
 };
 
+
 export const deleteTransactionService = async (id) => {
     return await prisma.transaction.update({
         where: { id: Number(id) },
@@ -22,13 +24,20 @@ export const deleteTransactionService = async (id) => {
     });
 };
 
-export const getTransactionsService = async (userId, query) => {
-    const { type, category, startDate, endDate } = query;
+
+export const getTransactionsService = async (user, query) => {
+    const { type, category, startDate, endDate, userId } = query;
 
     return await prisma.transaction.findMany({
         where: {
-            createdBy: userId,
             isDeleted: false,
+
+            // Admin can filter by any user
+            ...(user.role === "ADMIN" && userId && { createdBy: Number(userId) }),
+
+            // Non-admin only sees own
+            ...(user.role !== "ADMIN" && { createdBy: user.userId }),
+
             ...(type && { type }),
             ...(category && { category }),
             ...(startDate && endDate && {
@@ -38,16 +47,35 @@ export const getTransactionsService = async (userId, query) => {
                 },
             }),
         },
+        include: {
+            user: {
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    role: true
+                }
+            }
+        },
         orderBy: { date: "desc" },
     });
 };
 
+export const getSummaryService = async (user, query) => {
+    const { startDate, endDate } = query;
 
-export const getSummaryService = async (userId) => {
     const transactions = await prisma.transaction.findMany({
         where: {
-            createdBy: userId,
-            isDeleted: false
+            isDeleted: false,
+
+            ...(user.role !== "ADMIN" && { createdBy: user.userId }),
+
+            ...(startDate && endDate && {
+                date: {
+                    gte: new Date(startDate),
+                    lte: new Date(endDate),
+                },
+            }),
         }
     });
 
@@ -55,11 +83,8 @@ export const getSummaryService = async (userId) => {
     let expense = 0;
 
     transactions.forEach((t) => {
-        if (t.type === "INCOME") {
-            income += Number(t.amount);
-        } else {
-            expense += Number(t.amount);
-        }
+        if (t.type === "INCOME") income += Number(t.amount);
+        else expense += Number(t.amount);
     });
 
     return {
@@ -67,4 +92,19 @@ export const getSummaryService = async (userId) => {
         totalExpense: expense,
         balance: income - expense
     };
+};
+
+export const getTransactionByIdService = async (id) => {
+    return await prisma.transaction.findUnique({
+        where: { id: Number(id) },
+        include: {
+            user: {
+                select: {
+                    name: true,
+                    email: true,
+                    role: true
+                }
+            }
+        }
+    });
 };

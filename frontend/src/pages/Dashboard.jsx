@@ -9,6 +9,7 @@ import Toast from '../components/Toast';
 import { formatCurrency, formatDate } from '../utils/formatters';
 import { transactionsAPI } from '../api/api';
 import { useToast } from '../hooks/useToast';
+import { StatCardSkeleton, ChartSkeleton } from '../components/Skeletons';
 
 const tooltipStyle = {
   contentStyle: { backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' },
@@ -16,6 +17,27 @@ const tooltipStyle = {
 };
 
 const PIE_COLORS = ['#10b981', '#f43f5e'];
+
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 shadow-2xl animate-scale-in">
+        <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">{label}</p>
+        <div className="space-y-1.5">
+          {payload.map((entry, index) => (
+            <div key={index} className="flex items-center justify-between gap-6">
+              <span className="text-slate-500 text-xs font-medium">{entry.name}</span>
+              <span className={`text-sm font-bold ${entry.name === 'Income' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {entry.name === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(entry.value))}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
 
 // Group a flat list of transactions into monthly totals for the bar chart
 const groupByMonth = (transactions) => {
@@ -40,38 +62,82 @@ const Spinner = () => (
   </div>
 );
 
+const FilterButton = ({ label, active, onClick }) => (
+  <button
+    onClick={onClick}
+    className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-150 ${active ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'bg-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-700'}`}
+  >
+    {label}
+  </button>
+);
+
 const Dashboard = () => {
   const { toasts, addToast, removeToast } = useToast();
   const [summary, setSummary] = useState({ totalIncome: 0, totalExpense: 0, balance: 0 });
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [apiError, setApiError] = useState('');
+
+  // Date filters
+  const [dateFilter, setDateFilter] = useState({ from: '', to: '' });
+  const [activePreset, setActivePreset] = useState('ALL');
 
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   });
 
+  const loadData = async (filters = {}) => {
+    setLoading(true);
+    setApiError(''); // clear any old error
+    try {
+      const [summaryRes, txRes] = await Promise.all([
+        transactionsAPI.getSummary(filters),
+        transactionsAPI.getAll(filters),
+      ]);
+      setSummary(summaryRes.data);
+      setTransactions(txRes.data);
+    } catch (err) {
+      console.error('[DASHBOARD_ERROR]', err);
+      const msg = err.response?.data?.error || 'Failed to load dashboard data. Please check your connection.';
+      setApiError(msg);
+      addToast(msg, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        const [summaryRes, txRes] = await Promise.all([
-          transactionsAPI.getSummary(),
-          transactionsAPI.getAll(),
-        ]);
-        setSummary(summaryRes.data);
-        setTransactions(txRes.data);
-      } catch (err) {
-        const msg = err.response?.data?.error || 'Failed to load dashboard data.';
-        setError(msg);
-        addToast(msg, 'error');
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+    loadData(); // Initial load (all-time)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const handleApplyCustom = () => {
+    setActivePreset('CUSTOM');
+    loadData({ startDate: dateFilter.from, endDate: dateFilter.to });
+  };
+
+  const handlePreset = (preset) => {
+    setActivePreset(preset);
+    let from = '';
+    let to = new Date().toISOString().split('T')[0];
+
+    if (preset === '7D') {
+      from = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    } else if (preset === '30D') {
+      from = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    } else if (preset === 'MONTH') {
+      const start = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      from = start.toISOString().split('T')[0];
+    }
+
+    setDateFilter({ from, to });
+    if (preset === 'ALL') {
+      setDateFilter({ from: '', to: '' });
+      loadData({});
+    } else {
+      loadData({ startDate: from, endDate: to });
+    }
+  };
 
   const recentTransactions = useMemo(() => [...transactions].slice(0, 5), [transactions]);
   const monthlyData = useMemo(() => groupByMonth(transactions), [transactions]);
@@ -86,98 +152,177 @@ const Dashboard = () => {
       <main className="max-w-7xl mx-auto px-6 py-8">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-slate-100 text-xl font-semibold">Dashboard</h1>
-          <span className="text-slate-400 text-sm">{today}</span>
+          <span className="text-slate-400 text-sm font-medium">{today}</span>
         </div>
 
-        {error && (
-          <div className="mb-6 flex items-center gap-2.5 bg-rose-500/10 border border-rose-500/30 rounded-xl px-4 py-3 animate-fade-in">
-            <span className="text-rose-400 font-bold flex-shrink-0">✕</span>
-            <p className="text-rose-400 text-sm">{error}</p>
-            <button onClick={() => setError('')} className="ml-auto text-rose-400/60 hover:text-rose-400 transition-colors text-xs">✕</button>
+        {/* Filter Bar */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-8 flex flex-wrap items-center justify-between gap-6">
+          <div className="flex items-center gap-2">
+            <FilterButton label="All Time" active={activePreset === 'ALL'} onClick={() => handlePreset('ALL')} />
+            <FilterButton label="Last 7 Days" active={activePreset === '7D'} onClick={() => handlePreset('7D')} />
+            <FilterButton label="Last 30 Days" active={activePreset === '30D'} onClick={() => handlePreset('30D')} />
+            <FilterButton label="This Month" active={activePreset === 'MONTH'} onClick={() => handlePreset('MONTH')} />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <label className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">From</label>
+              <input
+                type="date"
+                value={dateFilter.from}
+                onChange={(e) => setDateFilter({ ...dateFilter, from: e.target.value })}
+                className="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg px-2 py-1.5 focus:border-indigo-500 focus:outline-none transition-colors"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">To</label>
+              <input
+                type="date"
+                value={dateFilter.to}
+                onChange={(e) => setDateFilter({ ...dateFilter, to: e.target.value })}
+                className="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg px-2 py-1.5 focus:border-indigo-500 focus:outline-none transition-colors"
+              />
+            </div>
+            <button
+              onClick={handleApplyCustom}
+              disabled={!dateFilter.from || !dateFilter.to || loading}
+              className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs font-bold px-4 py-2 rounded-lg transition-all"
+            >
+              Apply
+            </button>
+          </div>
+        </div>
+
+        {apiError && (
+          <div className="mb-6 flex items-center gap-3 bg-rose-500/10 border border-rose-500/30 rounded-2xl px-5 py-4 animate-fade-in shadow-lg">
+            <span className="text-rose-400 text-lg flex-shrink-0">⚠️</span>
+            <div className="flex-1">
+              <p className="text-rose-400 text-sm font-medium">{apiError}</p>
+            </div>
+            <button 
+              onClick={() => loadData(activePreset === 'CUSTOM' ? { startDate: dateFilter.from, endDate: dateFilter.to } : {})} 
+              className="bg-rose-500 hover:bg-rose-600 text-white text-xs px-4 py-1.5 rounded-lg transition-transform active:scale-95"
+            >
+              Reload
+            </button>
+            <button onClick={() => setApiError('')} className="text-rose-400/40 hover:text-rose-400 transition-colors text-xl">×</button>
           </div>
         )}
 
-        {loading ? (
-          <Spinner />
-        ) : (
           <>
-            {/* Stat Cards */}
-            <div className="grid grid-cols-3 gap-4 mb-8">
-              <StatCard
-                label="Total Income"
-                value={formatCurrency(summary.totalIncome)}
-                trend={{ direction: 'up', label: 'All-time income' }}
-              />
-              <StatCard
-                label="Total Expenses"
-                value={formatCurrency(summary.totalExpense)}
-                trend={{ direction: 'down', label: 'All-time expenses' }}
-              />
-              <StatCard
-                label="Net Balance"
-                value={formatCurrency(summary.balance)}
-                trend={{
-                  direction: summary.balance >= 0 ? 'up' : 'down',
-                  label: summary.balance >= 0 ? 'Positive cash flow' : 'Negative cash flow',
-                }}
-              />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              {loading ? (
+                <>
+                  <StatCardSkeleton />
+                  <StatCardSkeleton />
+                  <StatCardSkeleton />
+                </>
+              ) : (
+                <>
+                  <StatCard
+                    label="Total Income"
+                    variant="income"
+                    value={formatCurrency(summary.totalIncome)}
+                    trend={{ direction: 'up', label: activePreset === 'ALL' ? 'All-time income' : 'Filtered income' }}
+                  />
+                  <StatCard
+                    label="Total Expenses"
+                    variant="expense"
+                    value={formatCurrency(summary.totalExpense)}
+                    trend={{ direction: 'down', label: activePreset === 'ALL' ? 'All-time expenses' : 'Filtered expenses' }}
+                  />
+                  <StatCard
+                    label="Net Balance"
+                    variant="balance"
+                    value={formatCurrency(summary.balance)}
+                    trend={{
+                      direction: summary.balance >= 0 ? 'up' : 'down',
+                      label: summary.balance >= 0 ? 'Positive cash flow' : 'Negative cash flow',
+                    }}
+                  />
+                </>
+              )}
             </div>
 
             {/* Charts row */}
-            <div className="grid grid-cols-5 gap-4 mb-4">
+            <div className="grid grid-cols-5 gap-6 mb-8">
               {/* Bar Chart */}
-              <div className="col-span-3 bg-slate-900 border border-slate-800 rounded-xl p-5">
-                <h2 className="text-slate-300 text-sm font-medium mb-4">Monthly Income vs Expenses</h2>
-                {monthlyData.length === 0 ? (
-                  <p className="text-slate-500 text-sm text-center py-12">No data yet</p>
+              <div className="col-span-3">
+                {loading ? (
+                  <ChartSkeleton height={322} />
                 ) : (
-                  <ResponsiveContainer width="100%" height={240}>
-                    <BarChart data={monthlyData} barCategoryGap="30%">
-                      <XAxis dataKey="month" tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v / 1000}k`} />
-                      <Tooltip {...tooltipStyle} formatter={(v) => formatCurrency(v)} />
-                      <Legend wrapperStyle={{ color: '#94a3b8', fontSize: 12 }} />
-                      <Bar dataKey="income" name="Income" fill="#10b981" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="expense" name="Expense" fill="#f43f5e" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                    <h2 className="text-slate-300 text-sm font-medium mb-4">Monthly Income vs Expenses</h2>
+                    {monthlyData.length === 0 ? (
+                      <p className="text-slate-500 text-sm text-center py-12">No data yet</p>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={240}>
+                        <BarChart data={monthlyData} barCategoryGap="30%">
+                          <XAxis dataKey="month" tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} />
+                          <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v / 1000}k`} />
+                          <Tooltip content={<CustomTooltip />} cursor={false} />
+                          <Legend wrapperStyle={{ color: '#94a3b8', fontSize: 12, paddingTop: '10px' }} />
+                          <Bar 
+                            dataKey="income" 
+                            name="Income" 
+                            fill="#10b981" 
+                            radius={[4, 4, 0, 0]} 
+                            activeBar={{ opacity: 0.8, transform: 'scale(1.02)' }}
+                          />
+                          <Bar 
+                            dataKey="expense" 
+                            name="Expense" 
+                            fill="#f43f5e" 
+                            radius={[4, 4, 0, 0]} 
+                            activeBar={{ opacity: 0.8, transform: 'scale(1.02)' }}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
                 )}
               </div>
 
               {/* Pie Chart */}
-              <div className="col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-5 flex flex-col">
-                <h2 className="text-slate-300 text-sm font-medium mb-4">Income vs Expense Split</h2>
-                {summary.totalIncome === 0 && summary.totalExpense === 0 ? (
-                  <p className="text-slate-500 text-sm text-center py-12">No data yet</p>
+              <div className="col-span-2">
+                {loading ? (
+                  <ChartSkeleton height={322} />
                 ) : (
-                  <>
-                    <ResponsiveContainer width="100%" height={180}>
-                      <PieChart>
-                        <Pie
-                          data={pieData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={50}
-                          outerRadius={80}
-                          paddingAngle={3}
-                          dataKey="value"
-                        >
-                          {pieData.map((_, index) => (
-                            <Cell key={index} fill={PIE_COLORS[index]} />
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 flex flex-col h-full">
+                    <h2 className="text-slate-300 text-sm font-medium mb-4">Income vs Expense Split</h2>
+                    {summary.totalIncome === 0 && summary.totalExpense === 0 ? (
+                      <p className="text-slate-500 text-sm text-center py-12">No data yet</p>
+                    ) : (
+                      <>
+                        <ResponsiveContainer width="100%" height={180}>
+                          <PieChart>
+                            <Pie
+                              data={pieData}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={50}
+                              outerRadius={80}
+                              paddingAngle={3}
+                              dataKey="value"
+                            >
+                              {pieData.map((_, index) => (
+                                <Cell key={index} fill={PIE_COLORS[index]} />
+                              ))}
+                            </Pie>
+                            <Tooltip {...tooltipStyle} formatter={(v) => formatCurrency(v)} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                        <div className="flex justify-center gap-6 mt-2">
+                          {pieData.map((entry, i) => (
+                            <div key={entry.name} className="flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PIE_COLORS[i] }} />
+                              <span className="text-slate-400 text-xs">{entry.name}</span>
+                            </div>
                           ))}
-                        </Pie>
-                        <Tooltip {...tooltipStyle} formatter={(v) => formatCurrency(v)} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div className="flex justify-center gap-6 mt-2">
-                      {pieData.map((entry, i) => (
-                        <div key={entry.name} className="flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PIE_COLORS[i] }} />
-                          <span className="text-slate-400 text-xs">{entry.name}</span>
                         </div>
-                      ))}
-                    </div>
-                  </>
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -209,7 +354,6 @@ const Dashboard = () => {
               )}
             </div>
           </>
-        )}
       </main>
 
       <Toast toasts={toasts} removeToast={removeToast} />

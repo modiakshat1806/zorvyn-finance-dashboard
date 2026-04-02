@@ -7,12 +7,20 @@ export const authAPI = {
   register: (data) => api.post('/auth/register', data),
 };
 
+// ─── Users ────────────────────────────────────────────────────────────────────
+
+export const usersAPI = {
+  /** GET /users — ADMIN only, returns full user list for filter dropdown */
+  getAll: () => api.get('/users'),
+};
+
 // ─── Transactions ─────────────────────────────────────────────────────────────
 
 export const transactionsAPI = {
   /**
    * GET /transactions
-   * Supports optional filters: { type, category, startDate, endDate }
+   * Filters: { type, category, startDate, endDate, userId }
+   * userId is only respected by the backend if requester is ADMIN
    */
   getAll: (filters = {}) => {
     const params = {};
@@ -20,8 +28,12 @@ export const transactionsAPI = {
     if (filters.category && filters.category !== 'ALL') params.category = filters.category;
     if (filters.startDate) params.startDate = filters.startDate;
     if (filters.endDate) params.endDate = filters.endDate;
+    if (filters.userId && filters.userId !== 'ALL') params.userId = filters.userId;
     return api.get('/transactions', { params });
   },
+
+  /** GET /transactions/:id — full detail including user relation */
+  getById: (id) => api.get(`/transactions/${id}`),
 
   /** POST /transactions */
   create: (data) => api.post('/transactions', data),
@@ -29,6 +41,9 @@ export const transactionsAPI = {
   /** DELETE /transactions/:id */
   delete: (id) => api.delete(`/transactions/${id}`),
 
-  /** GET /transactions/summary → { totalIncome, totalExpense, balance } */
-  getSummary: () => api.get('/transactions/summary'),
+  /**
+   * GET /transactions/summary
+   * Optional date range: { startDate, endDate }
+   */
+  getSummary: (params = {}) => api.get('/transactions/summary', { params }),
 };

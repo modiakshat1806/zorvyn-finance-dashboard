@@ -4,7 +4,8 @@ import {
     createTransaction,
     getTransactions,
     deleteTransaction,
-    getSummary
+    getSummary,
+    getTransactionById
 } from "../controllers/transaction.controller.js";
 
 const router = express.Router();
@@ -19,5 +20,7 @@ router.get("/summary", authenticate, getSummary);
 
 // Delete (ADMIN only)
 router.delete("/:id", authenticate, authorize("ADMIN"), deleteTransaction);
+
+router.get("/:id", authenticate, getTransactionById);
 
 export default router;

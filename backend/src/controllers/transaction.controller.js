@@ -2,7 +2,8 @@ import {
     createTransactionService,
     getTransactionsService,
     deleteTransactionService,
-    getSummaryService
+    getSummaryService,
+    getTransactionByIdService
 } from "../services/transaction.service.js";
 
 export const createTransaction = async (req, res) => {
@@ -25,7 +26,7 @@ export const deleteTransaction = async (req, res) => {
 
 export const getTransactions = async (req, res) => {
     try {
-        const data = await getTransactionsService(req.user.userId, req.query);
+        const data = await getTransactionsService(req.user, req.query);
         res.json(data);
     } catch (err) {
         res.status(400).json({ error: err.message });
@@ -34,7 +35,16 @@ export const getTransactions = async (req, res) => {
 
 export const getSummary = async (req, res) => {
     try {
-        const data = await getSummaryService(req.user.userId);
+        const data = await getSummaryService(req.user, req.query);
+        res.json(data);
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+};
+
+export const getTransactionById = async (req, res) => {
+    try {
+        const data = await getTransactionByIdService(req.params.id);
         res.json(data);
     } catch (err) {
         res.status(400).json({ error: err.message });
