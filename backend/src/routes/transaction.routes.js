@@ -5,13 +5,14 @@ import {
     getTransactions,
     deleteTransaction,
     getSummary,
-    getTransactionById
+    getTransactionById,
+    updateTransaction
 } from "../controllers/transaction.controller.js";
 
 const router = express.Router();
 
-// Create (ANALYST + ADMIN)
-router.post("/", authenticate, authorize("ADMIN", "ANALYST"), createTransaction);
+// Create (ADMIN)
+router.post("/", authenticate, authorize("ADMIN"), createTransaction);
 
 // Get all (ALL users)
 router.get("/", authenticate, getTransactions);
@@ -22,5 +23,8 @@ router.get("/summary", authenticate, getSummary);
 router.delete("/:id", authenticate, authorize("ADMIN"), deleteTransaction);
 
 router.get("/:id", authenticate, getTransactionById);
+
+// UPDATE → ADMIN only (NEW FEATURE)
+router.put("/:id", authenticate, authorize("ADMIN"), updateTransaction);
 
 export default router;

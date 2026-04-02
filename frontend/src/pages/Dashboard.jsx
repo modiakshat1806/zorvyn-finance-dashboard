@@ -146,6 +146,16 @@ const Dashboard = () => {
     { name: 'Expense', value: summary.totalExpense },
   ];
 
+  const categoryData = useMemo(() => {
+    return Object.entries(summary.categoryTotals || {}).map(([name, totals]) => ({
+      name,
+      total: totals.income + totals.expense,
+      income: totals.income,
+      expense: totals.expense,
+      isIncomeHeavy: totals.income >= totals.expense,
+    })).sort((a, b) => b.total - a.total);
+  }, [summary.categoryTotals]);
+
   return (
     <div className="min-h-screen bg-slate-950">
       <Navbar />
@@ -325,6 +335,67 @@ const Dashboard = () => {
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Category Breakdown */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 mb-8">
+              <h2 className="text-slate-300 text-sm font-medium mb-4">Category Breakdown</h2>
+              {loading ? (
+                <ChartSkeleton height={200} />
+              ) : categoryData.length === 0 ? (
+                <p className="text-slate-500 text-sm text-center py-12">No data yet</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={categoryData} layout="vertical" margin={{ left: 40, right: 40 }}>
+                    <XAxis type="number" hide />
+                    <YAxis 
+                      dataKey="name" 
+                      type="category" 
+                      tick={{ fill: '#94a3b8', fontSize: 12 }} 
+                      width={100}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip 
+                      cursor={{ fill: 'rgba(255,255,255,0.05)' }} 
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 shadow-2xl">
+                              <p className="text-slate-200 text-sm font-bold mb-2">{data.name}</p>
+                              <div className="space-y-1">
+                                <div className="flex justify-between gap-4">
+                                  <span className="text-slate-500 text-xs text-left">Total:</span>
+                                  <span className="text-slate-100 text-xs font-bold">{formatCurrency(data.total)}</span>
+                                </div>
+                                {data.income > 0 && (
+                                  <div className="flex justify-between gap-4">
+                                    <span className="text-slate-500 text-xs text-left">Income:</span>
+                                    <span className="text-emerald-400 text-xs">{formatCurrency(data.income)}</span>
+                                  </div>
+                                )}
+                                {data.expense > 0 && (
+                                  <div className="flex justify-between gap-4">
+                                    <span className="text-slate-500 text-xs text-left">Expense:</span>
+                                    <span className="text-rose-400 text-xs">{formatCurrency(data.expense)}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Bar dataKey="total" radius={[0, 4, 4, 0]} barSize={20}>
+                      {categoryData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.isIncomeHeavy ? '#10b981' : '#f43f5e'} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </div>
 
             {/* Recent Transactions */}

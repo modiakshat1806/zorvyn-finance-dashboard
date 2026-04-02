@@ -38,6 +38,9 @@ export const transactionsAPI = {
   /** POST /transactions */
   create: (data) => api.post('/transactions', data),
 
+  /** UPDATE /transactions/:id */
+  update: (id, data) => api.put(`/transactions/${id}`, data),
+
   /** DELETE /transactions/:id */
   delete: (id) => api.delete(`/transactions/${id}`),
 

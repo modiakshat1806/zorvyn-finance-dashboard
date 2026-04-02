@@ -3,13 +3,23 @@ import {
     getTransactionsService,
     deleteTransactionService,
     getSummaryService,
-    getTransactionByIdService
+    getTransactionByIdService,
+    updateTransactionService
 } from "../services/transaction.service.js";
 
 export const createTransaction = async (req, res) => {
     try {
         const transaction = await createTransactionService(req.user.userId, req.body);
         res.status(201).json(transaction);
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+};
+
+export const updateTransaction = async (req, res) => {
+    try {
+        const updated = await updateTransactionService(req.params.id, req.body);
+        res.json(updated);
     } catch (err) {
         res.status(400).json({ error: err.message });
     }

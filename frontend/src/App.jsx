@@ -13,7 +13,7 @@ const App = () => (
     <Route path="/login" element={<Login />} />
     <Route path="/signup" element={<Signup />} />
     <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-    <Route path="/transactions" element={<ProtectedRoute><Transactions /></ProtectedRoute>} />
+    <Route path="/transactions" element={<ProtectedRoute allowedRoles={['ADMIN', 'ANALYST']}><Transactions /></ProtectedRoute>} />
     <Route path="/users" element={<ProtectedRoute allowedRoles={['ADMIN']}><Users /></ProtectedRoute>} />
     <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
   </Routes>

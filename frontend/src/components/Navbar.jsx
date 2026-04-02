@@ -35,23 +35,25 @@ const Navbar = () => {
 
           {/* Nav links */}
           <div className="hidden sm:flex items-center gap-1">
-            {NAV_LINKS.map(({ to, label }) => (
-              <Link
-                key={to}
-                to={to}
-                className={[
-                  'relative text-sm px-3 py-1.5 rounded-lg transition-all duration-150',
-                  isActive(to)
-                    ? 'text-slate-100 bg-slate-800'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60',
-                ].join(' ')}
-              >
-                {label}
-                {isActive(to) && (
-                  <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-indigo-500 rounded-full" />
-                )}
-              </Link>
-            ))}
+            {NAV_LINKS
+              .filter(({ to }) => user?.role !== 'VIEWER' || to !== '/transactions')
+              .map(({ to, label }) => (
+                <Link
+                  key={to}
+                  to={to}
+                  className={[
+                    'relative text-sm px-3 py-1.5 rounded-lg transition-all duration-150',
+                    isActive(to)
+                      ? 'text-slate-100 bg-slate-800'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60',
+                  ].join(' ')}
+                >
+                  {label}
+                  {isActive(to) && (
+                    <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-indigo-500 rounded-full" />
+                  )}
+                </Link>
+              ))}
             {user?.role === 'ADMIN' && (
               <Link
                 to="/users"

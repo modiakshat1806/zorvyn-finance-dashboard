@@ -101,6 +101,7 @@ const Transactions = () => {
 
   // Modal / form
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null); // null = add, ID = edit
   const [form, setForm] = useState(EMPTY_FORM);
   const [formErrors, setFormErrors] = useState({});
 
@@ -162,16 +163,30 @@ const Transactions = () => {
 
   // ── Modal helpers ──────────────────────────────────────────────────────────
   const openAdd = () => {
+    setEditingId(null);
     setForm(EMPTY_FORM);
+    setFormErrors({});
+    setModalOpen(true);
+  };
+  const openEdit = (tx) => {
+    setEditingId(tx.id);
+    setForm({
+      amount: String(tx.amount),
+      type: tx.type,
+      category: tx.category,
+      date: tx.date.split('T')[0],
+      notes: tx.notes || '',
+    });
     setFormErrors({});
     setModalOpen(true);
   };
   const closeModal = () => {
     setModalOpen(false);
+    setEditingId(null);
     setFormErrors({});
   };
 
-  // ── Add transaction ────────────────────────────────────────────────────────
+  // ── Save (Create/Update) ──────────────────────────────────────────────────
   const handleSave = async () => {
     const errs = validateForm(form);
     if (Object.keys(errs).length > 0) {
@@ -180,16 +195,24 @@ const Transactions = () => {
     }
     setSubmitting(true);
     try {
-      await transactionsAPI.create({
+      const payload = {
         amount: parseFloat(form.amount),
         type: form.type,
         category: form.category,
         date: form.date,
         notes: form.notes,
-      });
+      };
+
+      if (editingId) {
+        await transactionsAPI.update(editingId, payload);
+        addToast('Transaction updated successfully!', 'success');
+      } else {
+        await transactionsAPI.create(payload);
+        addToast('Transaction added successfully!', 'success');
+      }
+
       closeModal();
       fetchTransactions(appliedFilters);
-      addToast('Transaction added successfully!', 'success');
     } catch (err) {
       addToast(err.response?.data?.error || 'Failed to save transaction.', 'error');
     } finally {
@@ -239,7 +262,7 @@ const Transactions = () => {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-slate-100 text-xl font-semibold">Transactions</h1>
-          <RoleGuard allowedRoles={['ADMIN', 'ANALYST']}>
+          <RoleGuard allowedRoles={['ADMIN']}>
             <button
               id="add-transaction-btn"
               onClick={openAdd}
@@ -377,13 +400,22 @@ const Transactions = () => {
                       </td>
                       <td className="px-4 py-3">
                         <RoleGuard allowedRoles={['ADMIN']}>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); requestDelete(tx); }}
-                            className="text-slate-500 hover:text-rose-400 transition-colors duration-150 hover:scale-110 active:scale-95"
-                            title="Delete"
-                          >
-                            🗑️
-                          </button>
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); openEdit(tx); }}
+                              className="text-slate-500 hover:text-indigo-400 transition-colors duration-150 hover:scale-110 active:scale-95"
+                              title="Edit"
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); requestDelete(tx); }}
+                              className="text-slate-500 hover:text-rose-400 transition-colors duration-150 hover:scale-110 active:scale-95"
+                              title="Delete"
+                            >
+                              🗑️
+                            </button>
+                          </div>
                         </RoleGuard>
                       </td>
                     </tr>
@@ -402,7 +434,7 @@ const Transactions = () => {
         <div className="fixed inset-0 bg-black/60 flex justify-end z-50 animate-fade-in">
           <div className="w-full max-w-md bg-slate-900 border-l border-slate-800 h-full p-6 flex flex-col gap-5 overflow-y-auto animate-slide-up">
             <div className="flex items-center justify-between">
-              <h2 className="text-slate-100 font-semibold text-lg">Add Transaction</h2>
+              <h2 className="text-slate-100 font-semibold text-lg">{editingId ? 'Edit Transaction' : 'Add Transaction'}</h2>
               <button onClick={closeModal} className="text-slate-500 hover:text-slate-300 transition-colors text-xl leading-none">×</button>
             </div>
 
@@ -482,9 +514,9 @@ const Transactions = () => {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                     </svg>
-                    Adding…
+                    {editingId ? 'Updating…' : 'Adding…'}
                   </>
-                ) : 'Save Transaction'}
+                ) : editingId ? 'Update Transaction' : 'Save Transaction'}
               </button>
               <button
                 onClick={closeModal}

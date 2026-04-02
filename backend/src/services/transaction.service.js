@@ -25,6 +25,8 @@ export const deleteTransactionService = async (id) => {
 };
 
 
+
+
 export const getTransactionsService = async (user, query) => {
     const { type, category, startDate, endDate, userId } = query;
 
@@ -32,11 +34,10 @@ export const getTransactionsService = async (user, query) => {
         where: {
             isDeleted: false,
 
-            // Admin can filter by any user
+
             ...(user.role === "ADMIN" && userId && { createdBy: Number(userId) }),
 
-            // Non-admin only sees own
-            ...(user.role !== "ADMIN" && { createdBy: user.userId }),
+
 
             ...(type && { type }),
             ...(category && { category }),
@@ -61,15 +62,13 @@ export const getTransactionsService = async (user, query) => {
     });
 };
 
+
 export const getSummaryService = async (user, query) => {
     const { startDate, endDate } = query;
 
     const transactions = await prisma.transaction.findMany({
         where: {
             isDeleted: false,
-
-            ...(user.role !== "ADMIN" && { createdBy: user.userId }),
-
             ...(startDate && endDate && {
                 date: {
                     gte: new Date(startDate),
@@ -82,18 +81,31 @@ export const getSummaryService = async (user, query) => {
     let income = 0;
     let expense = 0;
 
+    const categoryTotals = {};
+
     transactions.forEach((t) => {
-        if (t.type === "INCOME") income += Number(t.amount);
-        else expense += Number(t.amount);
+        const amt = Number(t.amount);
+
+        if (t.type === "INCOME") income += amt;
+        else expense += amt;
+
+        if (!categoryTotals[t.category]) {
+            categoryTotals[t.category] = { income: 0, expense: 0 };
+        }
+        if (t.type === "INCOME") {
+            categoryTotals[t.category].income += amt;
+        } else {
+            categoryTotals[t.category].expense += amt;
+        }
     });
 
     return {
         totalIncome: income,
         totalExpense: expense,
-        balance: income - expense
+        balance: income - expense,
+        categoryTotals
     };
 };
-
 export const getTransactionByIdService = async (id) => {
     return await prisma.transaction.findUnique({
         where: { id: Number(id) },
@@ -105,6 +117,16 @@ export const getTransactionByIdService = async (id) => {
                     role: true
                 }
             }
+        }
+    });
+};
+
+export const updateTransactionService = async (id, data) => {
+    return await prisma.transaction.update({
+        where: { id: Number(id) },
+        data: {
+            ...data,
+            ...(data.date && { date: new Date(data.date) })
         }
     });
 };
